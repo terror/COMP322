@@ -14,6 +14,6 @@ forbid:
   ./bin/forbid
 
 run name:
-  g++ -std=c++11 src/{{name}}.cpp
+  g++ -std=c++17 src/{{name}}.cpp
   ./a.out
   rm -rf a.out
