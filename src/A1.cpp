@@ -157,9 +157,84 @@ void list_mismatched_lines(string file1, string file2) {
 }
 
 /*
- * TODO
+ * A recursive helper function for `list_mismatched_words`.
+ *
+ * @param file1 The first input file name.
+ * @param words1 The words present in the first input file.
+ * @param file2 The second input file name.
+ * @param words2 The words present in the second input file.
+ */
+void list_mismatched_words_helper(
+  string file1, vector<pair<string, int>> words1, string file2,
+  vector<pair<string, int>> words2
+) {
+  if (words1.empty() && words2.empty())
+    return;
+
+  if (!words1.empty() && !words2.empty()) {
+    if (hash_it(words1.front().first) != hash_it(words2.front().first))
+      cout << file1 << ": " << words1.front().first << " (line "
+           << words1.front().second << ")\n"
+           << file2 << ": " << words2.front().first << " (line "
+           << words2.front().second << ")\n";
+    list_mismatched_words_helper(
+      file1, vector<pair<string, int>>(words1.begin() + 1, words1.end()), file2,
+      vector<pair<string, int>>(words2.begin() + 1, words2.end())
+    );
+  } else if (words1.empty() && !words2.empty()) {
+    cout << file1 << ":\n"
+         << file2 << ": " << words2.front().first << " (line "
+         << words2.front().second << ")\n";
+    list_mismatched_words_helper(
+      file1, words1, file2,
+      vector<pair<string, int>>(words2.begin() + 1, words2.end())
+    );
+  } else {
+    cout << file1 << ": " << words1.front().first << " (line "
+         << words1.front().second << ")\n"
+         << file2 << ":\n";
+    list_mismatched_words_helper(
+      file1, vector<pair<string, int>>(words1.begin() + 1, words1.end()), file2,
+      words2
+    );
+  }
+}
+
+/*
+ * A function that lists all mismatched words in the given
+ * input files.
+ *
+ * @param file1 The relative path of the first input file.
+ * @param file2 The relative path of the second input file.
  */
 void list_mismatched_words(string file1, string file2) {
+  ifstream file1_stream(file1), file2_stream(file2);
+
+  string str;
+
+  vector<pair<string, int>> words1, words2;
+
+  int curr = 1;
+
+  while (file1_stream >> str) {
+    words1.push_back(make_pair(str, curr));
+    curr += file1_stream.peek() == '\n';
+  }
+
+  curr = 1;
+
+  while (file2_stream >> str) {
+    words2.push_back(make_pair(str, curr));
+    curr += file2_stream.peek() == '\n';
+  }
+
+  list_mismatched_words_helper(
+    filesystem::path(file1).filename(), words1,
+    filesystem::path(file2).filename(), words2
+  );
+
+  file1_stream.close();
+  file2_stream.close();
 }
 
 /*
