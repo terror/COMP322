@@ -1,12 +1,13 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
 
 /*
- * The program help text;
+ * The program help text.
  */
 const char *TEXT =
   "Welcome to the Comp322 file versioning system!\n\n"
@@ -17,6 +18,16 @@ const char *TEXT =
   "To compare any 2 versions press 'c'\n"
   "To search versions for a keyword press 's'\n"
   "To exit press 'e'\n\n";
+
+/*
+ * Command help text.
+ */
+unordered_map<string, string> HELP = {
+  {"LOAD", "Which version would you like to load? "},
+  {"COMPARE_LHS", "Please enter the number of the first version to compare: "},
+  {"COMPARE_RHS", "Please enter the number of the second version to compare: "},
+  {"SEARCH", "Please enter the keyword that you are looking for: "},
+  {"REMOVE", "Enter the number of the version that you want to delete: "}};
 
 /*
  * The name of the tracked file.
@@ -58,13 +69,28 @@ Node *head = nullptr;
 static int version = 1;
 
 /*
+ * Mark a current version as `active`.
+ *
+ * @param version The version to mark.
+ */
+void set_active(int version) {
+  Node *curr = head;
+
+  while (curr != nullptr) {
+    curr->active = curr->version == version ? true : false;
+    curr = curr->next;
+  }
+}
+
+/*
  * Add a new file version to the list.
  *
  * @param content The file's content.
  */
 void add(string content) {
   if (head == nullptr) {
-    head = new Node(version++, content, nullptr, nullptr);
+    head = new Node(version, content, nullptr, nullptr);
+    set_active(version++);
   } else {
     if (head->prev != nullptr && head->prev->content == content || head->content == content) {
       cout << "git322 did not detect any change to your file and will not "
@@ -78,7 +104,9 @@ void add(string content) {
     while (curr != nullptr)
       curr = curr->next;
 
-    curr->next = new Node(version++, content, nullptr, curr);
+    curr->next = new Node(version, content, nullptr, curr);
+
+    set_active(version++);
   }
 }
 
@@ -112,6 +140,7 @@ void print() {
  * @param version The version of the file to load.
  */
 void load(int version) {
+  set_active(version);
 }
 
 /**
@@ -191,19 +220,19 @@ void eval(char input) {
     print();
     break;
   case 'l':
-    load(read_byte("Which version would you like to load? "));
+    load(read_byte(HELP["LOAD"]));
+    break;
   case 'c':
-    compare(
-      read_byte("Please enter the number of the first version to compare: "),
-      read_byte("Please enter the number of the second version to compare: ")
-    );
+    compare(read_byte(HELP["COMPARE_LHS"]), read_byte(HELP["COMPARE_RHS"]));
     break;
   case 's':
-    search(read_string("Please enter the keyword that you are looking for: "));
+    search(read_string(HELP["SEARCH"]));
     break;
   case 'r':
-    remove(read_byte("Enter the number of the version that you want to delete: "
-    ));
+    remove(read_byte(HELP["REMOVE"]));
+    break;
+  case 'e':
+    exit(0);
     break;
   default:
     break;
