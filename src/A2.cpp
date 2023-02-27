@@ -40,22 +40,39 @@ const char *FILENAME = "file.txt";
 class Node {
 public:
   Node *next;
-  Node *prev;
   bool active;
   int version;
   string content;
 
-  Node(int version, string content, Node *next, Node *prev) {
+  Node(int version, string content, Node *next) {
     this->version = version;
     this->content = content;
     this->next = next;
-    this->prev = prev;
   }
 
+  /*
+   * Retrieve the hash value of the nodes contents.
+   */
   size_t get_hash() {
     return hash<string>{}(this->content);
   }
+
+  /*
+   * Node destructor.
+   */
+  ~Node() {
+    delete next;
+  }
 };
+
+/*
+ * Overloaded `<<` operator for a `Node` instance.
+ */
+ostream &operator<<(ostream &outs, Node *node) {
+  return outs << "Version number: " << node->version << '\n'
+              << "Hash value: " << node->get_hash() << '\n'
+              << "Content: " << node->content;
+}
 
 /*
  * A list of file versions.
@@ -88,6 +105,24 @@ public:
   }
 
   /*
+   * Retrieve the current active version.
+   *
+   * @return The node in the list that is currently
+   * marked as active.
+   */
+  Node *get_active() {
+    Node *curr = head;
+
+    while (curr != nullptr) {
+      if (curr->active)
+        return curr;
+      curr = curr->next;
+    }
+
+    return nullptr;
+  }
+
+  /*
    * Add a new file version to the list.
    *
    * @param content The file's content.
@@ -96,22 +131,22 @@ public:
     Node *curr = head;
 
     if (curr == nullptr) {
-      head = new Node(version, content, nullptr, nullptr);
+      head = new Node(version, content, nullptr);
       set_active(version++);
       return;
     }
 
-    if (curr->prev != nullptr && curr->prev->content == content || curr->content == content) {
+    if (get_active()->content == content) {
       cout << "git322 did not detect any change to your file and will not "
               "create a new version."
            << "\n\n";
       return;
     }
 
-    while (curr != nullptr)
+    while (curr->next != nullptr)
       curr = curr->next;
 
-    curr->next = new Node(version, content, nullptr, curr);
+    curr->next = new Node(version, content, nullptr);
 
     set_active(version++);
   }
@@ -130,9 +165,7 @@ public:
     }
 
     while (curr != nullptr) {
-      cout << "Version number: " << curr->version << '\n';
-      cout << "Hash value: " << curr->get_hash() << '\n';
-      cout << "Content: " << curr->content << '\n';
+      cout << curr << '\n';
       curr = curr->next;
     }
 
@@ -151,8 +184,60 @@ public:
 
   /**
    * Diff two file versions.
+   *
+   * @param version1
+   * @param version2
    */
   void compare(int version1, int version2) {
+    string lhs, rhs;
+
+    Node *curr = head;
+
+    auto get_lines = [&](string s) {
+      istringstream stream(s);
+      string line;
+      vector<string> result;
+      while (getline(stream, line))
+        result.push_back(line);
+      return result;
+    };
+
+    auto transform = [&](string s) { return s.empty() ? "<Empty line>" : s; };
+
+    while (curr != nullptr) {
+      if (curr->version == version1)
+        lhs = curr->content;
+      if (curr->version == version2)
+        rhs = curr->content;
+      curr = curr->next;
+    }
+
+    vector<string> lines1 = get_lines(lhs), lines2 = get_lines(rhs);
+
+    int i = 0;
+
+    while (true) {
+      if (i >= lines1.size() && i >= lines2.size())
+        break;
+
+      cout << "Line " << (i + 1) << ": ";
+
+      if (i < lines1.size() && i < lines2.size()) {
+        if (lines1[i] != lines2[i])
+          cout << transform(lines1[i]) << " <<>> " << transform(lines2[i]);
+        else
+          cout << "<Identical>";
+      } else if (i >= lines1.size() && i < lines2.size())
+        cout << "<Empty line>"
+             << " <<>> " << lines2[i];
+      else
+        cout << lines1[i] << " <<>> "
+             << "<Empty line>";
+
+      cout << '\n';
+
+      ++i;
+    }
   }
 
   /*
@@ -161,6 +246,26 @@ public:
    * @param keyword The keyword to look for.
    */
   void search(string keyword) {
+    bool found = false;
+
+    Node *curr = head;
+
+    while (curr != nullptr) {
+      if (curr->content.find(keyword) != string::npos) {
+        if (!found) {
+          cout << "The keyword " << keyword
+               << " has been found in the following versions:" << '\n';
+          found = true;
+        }
+        cout << curr << '\n';
+      }
+      curr = curr->next;
+    }
+
+    if (!found) {
+      cout << "Your keyword " << keyword << " was not found in any version."
+           << '\n';
+    }
   }
 
   /*
@@ -169,6 +274,35 @@ public:
    * @param version The version of the file.
    */
   void remove(int version) {
+    Node *curr = head;
+
+    if (curr->version == version) {
+      head = head->next;
+      delete curr;
+      return;
+    }
+
+    Node *prev = nullptr;
+
+    while (curr != nullptr) {
+      if (curr->version == version) {
+        prev->next = curr->next;
+        delete curr;
+        return;
+      }
+      curr = curr->next, prev = curr;
+    }
+  }
+
+  /*
+   * List destructor.
+   */
+  ~List() {
+    while (head != nullptr) {
+      Node *curr = head;
+      head = head->next;
+      delete curr;
+    }
   }
 };
 
@@ -226,9 +360,12 @@ public:
   List *list;
   Scanner *scanner;
 
-  Interpreter(Scanner *scanner, List *list) {
-    this->scanner = scanner;
-    this->list = list;
+  /*
+   * Default constructor.
+   */
+  Interpreter() {
+    this->scanner = new Scanner();
+    this->list = new List();
   }
 
   /*
@@ -261,11 +398,21 @@ public:
       list->remove(scanner->read_byte(PROMPT["REMOVE"]));
       break;
     case 'e':
+      delete this;
       exit(0);
       break;
     default:
+      cout << "Invalid input character." << '\n';
       break;
     }
+  }
+
+  /*
+   * Interpreter destructor.
+   */
+  ~Interpreter() {
+    delete list;
+    delete scanner;
   }
 };
 
@@ -273,7 +420,7 @@ public:
  * Program entrypoint.
  */
 int main() {
-  Interpreter *interpreter = new Interpreter(new Scanner(), new List());
+  Interpreter *interpreter = new Interpreter();
 
   for (;;)
     interpreter->eval();
