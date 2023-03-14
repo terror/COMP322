@@ -294,10 +294,9 @@ class List {
       vector<Node *> nodes;
 
       while (curr != nullptr) {
-        if (curr->contains(keyword)) {
+        if (curr->contains(keyword))
           nodes.push_back(curr);
-          curr = curr->next;
-        }
+        curr = curr->next;
       }
 
       if (!nodes.empty()) {
