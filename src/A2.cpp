@@ -64,13 +64,6 @@ class Node {
     bool contains(string keyword) {
       return content.find(keyword) != string::npos;
     }
-
-    /*
-     * Node destructor.
-     */
-    ~Node() {
-      delete next;
-    }
 };
 
 /*
@@ -483,4 +476,6 @@ int main() {
 
   for (;;)
     interpreter->eval();
+
+  delete interpreter;
 }
