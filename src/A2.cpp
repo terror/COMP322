@@ -415,8 +415,8 @@ class Interpreter {
      * Default constructor.
      */
     Interpreter() {
-      this->scanner = new Scanner();
       this->list = new List();
+      this->scanner = new Scanner();
     }
 
     /*
