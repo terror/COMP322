@@ -102,7 +102,7 @@ class List {
     }
 
     /*
-     * Get a node with a specifc version.
+     * Get a node with a specific version.
      *
      * @param version The version of the node.
      * @return The node with the specified version.

@@ -29,7 +29,7 @@ bool word_diff(string word1, string word2) {
  *
  * @param file1 The first input file relative path.
  * @param file2 The second input file relative path.
- * @return Whether or not the two input files are indentical in content.
+ * @return Whether or not the two input files are identical in content.
  */
 bool classical_file_diff(string file1, string file2) {
   ifstream file1_stream(file1), file2_stream(file2);
