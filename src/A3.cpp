@@ -75,7 +75,7 @@ class List {
     }
 
     /*
-     * Get a node with a specifc version.
+     * Get a node with a specific version.
      *
      * @param version The version of the node.
      * @return The node with the specified version.
@@ -103,6 +103,24 @@ class List {
     }
 
     /*
+     * Get the tracked filename from this list.
+     *
+     * @return The tracked filename.
+     */
+    string get_filename() {
+      return filename;
+    }
+
+    /*
+     * Set the current version of this list.
+     *
+     * @param version The current version of this list.
+     */
+    void set_version(int version) {
+      this->version = version;
+    }
+
+    /*
      * Add a new file version to the list.
      *
      * => Adds a new node to the front of the linked list.
@@ -125,6 +143,34 @@ class List {
       }
 
       curr = new Node(version++, content, head);
+
+      head = curr;
+    }
+
+    /*
+     * Add a new file version to the list.
+     *
+     * => Adds a new node to the front of the linked list.
+     *
+     * @param version The file's version.
+     * @param content The file's content.
+     */
+    void add(int version, string content) {
+      Node *curr = head;
+
+      if (curr == nullptr) {
+        head = new Node(version, content, nullptr);
+        return;
+      }
+
+      if (head->content == content) {
+        cout << "git322 did not detect any change to your file and will not "
+                "create a new version."
+             << "\n";
+        return;
+      }
+
+      curr = new Node(version, content, head);
 
       head = curr;
     }
@@ -320,6 +366,87 @@ class List {
     }
 
     /*
+     * Serialize this list to disk.
+     *
+     * @param filename The filename we should serialize data to.
+     */
+    void serialize(const string &db) {
+      ofstream stream(db, ios::binary);
+
+      int list_length = length();
+      stream.write(reinterpret_cast<char *>(&list_length), sizeof(list_length));
+
+      Node *curr = head;
+
+      while (curr != nullptr) {
+        stream.write(
+          reinterpret_cast<char *>(&curr->version), sizeof(curr->version)
+        );
+
+        size_t content_size = curr->content.size();
+
+        stream.write(
+          reinterpret_cast<char *>(&content_size), sizeof(content_size)
+        );
+
+        stream.write(curr->content.c_str(), curr->content.size());
+
+        curr = curr->next;
+      }
+
+      stream.close();
+    }
+
+    /*
+     * Deserialize this list from disk.
+     *
+     * @param filename The filename we should read data from.
+     * @return The deserialized list data structure.
+     */
+    static List *deserialize(const string &db, const string &filename) {
+      ifstream stream(db, ios::binary);
+
+      List *data = new List(filename);
+
+      if (!stream.is_open())
+        return data;
+
+      int list_length;
+      stream.read(reinterpret_cast<char *>(&list_length), sizeof(list_length));
+
+      vector<pair<int, string>> to_insert;
+
+      for (int i = 0; i < list_length; ++i) {
+        int version;
+        stream.read(reinterpret_cast<char *>(&version), sizeof(version));
+
+        size_t content_size;
+
+        stream.read(
+          reinterpret_cast<char *>(&content_size), sizeof(content_size)
+        );
+
+        string content(content_size, '\0');
+        stream.read(&content[0], content_size);
+
+        to_insert.push_back(make_pair(version, content));
+      }
+
+      int curr_version = 0;
+
+      for (int i = to_insert.size() - 1; ~i; --i) {
+        data->add(to_insert[i].first, to_insert[i].second);
+        curr_version = max(to_insert[i].first, curr_version);
+      }
+
+      data->set_version(curr_version + 1);
+
+      stream.close();
+
+      return data;
+    }
+
+    /*
      * List destructor.
      */
     ~List() {
@@ -378,7 +505,7 @@ class Scanner {
 };
 
 /*
- * Reads and interprets user input.
+ * A file-tracking API without on-disk persistence.
  */
 class Git322 {
   private:
@@ -408,19 +535,34 @@ class Git322 {
       {"REMOVE", "Enter the number of the version that you want to delete: "}};
 
     /*
-     * The name of the tracked file.
+     * A bunch of I/O utilities.
      */
-    const char *FILENAME = "file.txt";
-
-  public:
-    List *list;
     Scanner *scanner;
 
+  protected:
     /*
-     * Default constructor.
+     * The list of file versions.
      */
-    Git322() {
-      this->list = new List(FILENAME);
+    List *list;
+
+  public:
+    /*
+     * Standard filename constructor.
+     *
+     * @param filename The filename to track.
+     */
+    Git322(string filename) {
+      this->list = new List(filename);
+      this->scanner = new Scanner();
+    }
+
+    /*
+     * Predefined data constructor.
+     *
+     * @param list The list instance read from disk.
+     */
+    Git322(List *list) {
+      this->list = list;
       this->scanner = new Scanner();
     }
 
@@ -433,7 +575,7 @@ class Git322 {
     void eval() {
       switch (scanner->read_byte(MENU)) {
       case 'a':
-        list->add(scanner->read_file(FILENAME));
+        list->add(scanner->read_file(list->get_filename()));
         break;
       case 'p':
         list->print();
@@ -464,11 +606,44 @@ class Git322 {
     }
 
     /*
-     * Interpreter destructor.
+     * Git322 destructor.
      */
-    ~Git322() {
+    virtual ~Git322() {
       delete list;
       delete scanner;
+    }
+};
+
+/*
+ * A file-tracking API with on-disk persistence.
+ */
+class EnhancedGit322 : public Git322 {
+  private:
+    /*
+     * The database filename.
+     */
+    string db;
+
+  public:
+    /*
+     * EnhancedGit322 constructor.
+     *
+     * Reads database from disk and passes
+     * the resulting list instance to the
+     * super class.
+     *
+     * @param db The database filename.
+     */
+    EnhancedGit322(string filename, string db)
+      : Git322(List::deserialize(db, filename)) {
+      this->db = db;
+    }
+
+    /*
+     * EnhancedGit322 destructor.
+     */
+    ~EnhancedGit322() {
+      list->serialize(db);
     }
 };
 
@@ -476,7 +651,7 @@ class Git322 {
  * Program entrypoint.
  */
 int main() {
-  Git322 *git = new Git322();
+  EnhancedGit322 *git = new EnhancedGit322("file.txt", "db.txt");
 
   for (;;)
     git->eval();
