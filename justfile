@@ -5,7 +5,7 @@ export EDITOR := 'nvim'
 default:
   just --list
 
-all: forbid fmt
+all: forbid fmt typos
 
 fmt:
   clang-format -i -style=file:.clang-format src/*.cpp
@@ -17,3 +17,6 @@ run name:
   @g++ -std=c++17 src/{{name}}.cpp
   @./a.out
   @rm -rf a.out
+
+typos:
+  typos
